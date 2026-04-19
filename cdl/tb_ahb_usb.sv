@@ -394,10 +394,23 @@ module tb_ahb_usb();
 
     initial begin
 
-        test_name = "Status Register Read";
         n_rst = 1;
         dp_in = 1;
         dm_in = 0;
+
+        test_name = "Reset defaults";
+        reset_dut();
+        enqueue_read(4'h4, 2'd1, 32'h0000_0000);
+        execute_transactions(1);
+        finish_transactions();
+        enqueue_read(4'h6, 2'd1, 32'h0000_0000);
+        execute_transactions(1);
+        finish_transactions();
+        enqueue_read(4'h8, 2'd0, 32'h0000_0000);
+        execute_transactions(1);
+        finish_transactions();
+
+        test_name = "ACK status after RX done";
         reset_dut();
         sync_byte();
         ack_pid();
@@ -408,8 +421,23 @@ module tb_ahb_usb();
         execute_transactions(1);
         finish_transactions();
 
+        test_name = "Status during ACK receive";
+        reset_dut();
+        fork
+            begin
+                sync_byte();
+                ack_pid();
+                eop();
+            end
+            begin
+                #(900ns);
+                enqueue_read(4'h4, 2'd1, 32'h0000_0100);
+                execute_transactions(1);
+                finish_transactions();
+            end
+        join
 
-        test_name = "DATA0";
+        test_name = "DATA0 occupancy and status";
         reset_dut();
         sync_byte();
         data0_pid();
@@ -424,6 +452,35 @@ module tb_ahb_usb();
         enqueue_read(4'h4, 2'd1, 32'h0000_0011);
         execute_transactions(1);
         finish_transactions();
+
+        test_name = "DATA0 read byte low";
+        enqueue_read(4'h0, 2'd0, 32'h0000_0055);
+        execute_transactions(1);
+        finish_transactions();
+        enqueue_read(4'h8, 2'd0, 32'h0000_0001);
+        execute_transactions(1);
+        finish_transactions();
+
+        test_name = "DATA0 read byte high";
+        enqueue_read(4'h0, 2'd0, 32'h0000_00aa);
+        execute_transactions(1);
+        finish_transactions();
+        enqueue_read(4'h8, 2'd0, 32'h0000_0000);
+        execute_transactions(1);
+        finish_transactions();
+
+        test_name = "DATA0 halfword read";
+        reset_dut();
+        sync_byte();
+        data0_pid();
+        random_data();
+        data_crc();
+        eop();
+        #(83.33333);
+        #(83.33333);
+        enqueue_read(4'h8, 2'd0, 32'h0000_0002);
+        execute_transactions(1);
+        finish_transactions();
         enqueue_read(4'h0, 2'd1, 32'h0000_aa55);
         execute_transactions(1);
         finish_transactions();
@@ -431,8 +488,35 @@ module tb_ahb_usb();
         execute_transactions(1);
         finish_transactions();
 
-
-
+        test_name = "OUT then DATA0 host to endpoint";
+        reset_dut();
+        sync_byte();
+        out_pid();
+        token_data_crc();
+        eop();
+        #(400ns);
+        sync_byte();
+        data0_pid();
+        random_data();
+        data_crc();
+        eop();
+        #(83.33333);
+        #(83.33333);
+        enqueue_read(4'h4, 2'd1, 32'h0000_0014);
+        execute_transactions(1);
+        finish_transactions();
+        enqueue_read(4'h8, 2'd0, 32'h0000_0002);
+        execute_transactions(1);
+        finish_transactions();
+        enqueue_read(4'h0, 2'd0, 32'h0000_0055);
+        execute_transactions(1);
+        finish_transactions();
+        enqueue_read(4'h0, 2'd0, 32'h0000_00aa);
+        execute_transactions(1);
+        finish_transactions();
+        enqueue_read(4'h8, 2'd0, 32'h0000_0000);
+        execute_transactions(1);
+        finish_transactions();
 
         $finish;
     end
